@@ -15,7 +15,11 @@ using namespace amrex;
 void
 ERF::timeStep (int lev, Real time, int /*iteration*/)
 {
-    if (regrid_int > 0)  // We may need to regrid
+
+amrex::Print() << "I AM AT THE BEGINNING OF timeSTEP " << std::endl;
+amrex::Print() << "At the beginning of TimeStep, Processor " << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs()
+               << " checking ERF_USE_WW3_COUPLING." << std::endl;
+if (regrid_int > 0)  // We may need to regrid
     {
         // help keep track of whether a level was already regridded
         // from a coarser level call to regrid
@@ -63,14 +67,32 @@ ERF::timeStep (int lev, Real time, int /*iteration*/)
                        << " with dt = " << dt[lev] << std::endl;
     }
 
+amrex::Print() << "Processor " << amrex::ParallelDescriptor::MyProc()
+               << " is checking ERF_USE_WW3_COUPLING." << std::endl;
+
 #ifdef ERF_USE_WW3_COUPLING
+amrex::Print() << "ERF_USE_WW3_COUPLING is defined." << std::endl;
+#else
+amrex::Print() << "ERF_USE_WW3_COUPLING is NOT defined." << std::endl;
+#endif
+
+
+#ifdef ERF_USE_WW3_COUPLING
+    int global_rank = amrex::ParallelDescriptor::MyProc();
+
+    amrex::Print() <<  " I AM HERE " << std::endl;
+
+    amrex::Print() << "Total number of MPI ranks (ERF time_step): " << amrex::ParallelDescriptor::NProcs() << std::endl;
+    amrex::Print() << "Processor " << global_rank << " is about to call send_to_ww3." << std::endl;
+    amrex::Print() << "Before calling send_to_ww3 the global mpi rank is:" << global_rank <<std::endl;
+    
+
     amrex::Print() <<  " About to call send_to_ww3 from ERF_Timestep" << std::endl;
     send_to_ww3(lev);
+
+    amrex::Print() << "After calling send_waves the global mpi rank is:" << global_rank <<std::endl;
     amrex::Print() <<  " About to call read_waves from ERF_Timestep"  << std::endl;
     read_waves(lev);
-    //send_to_ww3(lev);
-    //read_waves(lev);
-    //send_to_ww3(lev);
 #endif
 
     // Advance a single level for a single time step

@@ -107,9 +107,6 @@ ERF::read_waves (int lev)
             }
         });
     }
-         //    amrex::Real myclock = ParallelDescriptor::second();
-
-        //     amrex::AllPrintToFile("timer.txt") << "At " << myclock << " seconds, I reached the end of read_waves" << std::endl;
 
     timedif = ( ((double) clock()) / CLOCKS_PER_SEC) - clkStart;
 
@@ -138,28 +135,10 @@ ERF::send_to_ww3 (int lev)
 
     MultiFab yvel_data(lev_new[Vars::yvel].boxArray(), lev_new[Vars::yvel].DistributionMap(), 1, lev_new[Vars::yvel].nGrowVect());
 
-/*
-    BoxArray ba_onegrid(geom[lev].Domain());
-    BoxList bl2d = ba.boxList();
-    Real* theta_ptr = &theta(domlo);
-    for (auto& b : bl2d) {
-        b.setRange(2,0);
-    }
-    BoxArray ba2d(std::move(bl2d));
 
-    // create a new BoxArray and DistributionMapping for a MultiFab with 1 box
-    BoxArray ba_onegrid(lev_new[Vars::cons].boxArray());
-    BoxList bl2d_onegrid = ba_onegrid.boxList();
-    for (auto& b : bl2d_onegrid) {
-        b.setRange(2,0);
-    }
-    BoxArray ba2d_onegrid(std::move(bl2d_onegrid));
-    Vector<int> pmap;
-    pmap.resize(1);
-    pmap[0]=0;
-    DistributionMapping dm_onegrid(ba2d_onegrid);
-    dm_onegrid.define(pmap);
-*/
+if (amrex::ParallelDescriptor::MyProc() == 1) {
+    amrex::Print() << "Processor 1 is activated at the beginning of send_to_ww3." << std::endl;
+}
 
     // Make local copy of xvel, yvel
     MultiFab::Copy (xvel_data, lev_new[Vars::xvel], 0, 0, 1, lev_new[Vars::xvel].nGrowVect());
@@ -262,14 +241,87 @@ ERF::send_to_ww3 (int lev)
   });
 
 
-    // Send the 2D slice at k_ref
+// Debug multi send
+
+    amrex::AllPrint() << "Processor " << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs() << " is inside send_waves" << std::endl;
+   
+amrex::AllPrint() << "MPMD NProcs() = " <<  amrex::MPMD::NProcs() << std::endl; 
+
+// Send the 2D slice at k_ref
         // Box slice_box = bx;
         amrex::IntVect boxSmall = bx.smallEnd();
         amrex::IntVect boxBig = bx.bigEnd();
-        Box slice_box_ref = makeSlab(bx, 2, k_ref);
+       // NEW EDITS
+       // Box slice_box_ref = makeSlab(bx, 2, k_ref); 
+
+
+    amrex::AllPrint() << "Processor " << amrex::ParallelDescriptor::MyProc() 
+               << " has box with small end: " << boxSmall 
+               << " and big end: " << boxBig << std::endl;
+    
 
     // Calculate the number of elements in the current box
-    int n_elements = slice_box_ref.numPts();
+    //int n_elements = slice_box_ref.numPts();
+
+    //STARTING NEW EDITS:
+
+    int n_elements = 0;
+    //for (MFIter mfi(u_mag, TilingIfNotGPU()); mfi.isValid(); ++mfi){
+        //Box bx = mfi.tilebox();
+        Box slice_box_ref = makeSlab(bx, 2, k_ref);
+        n_elements += slice_box_ref.numPts();
+    //}
+    
+
+    int num_procs = amrex::ParallelDescriptor::NProcs(); // Get the total number of processes
+    int rank = amrex::ParallelDescriptor::MyProc();      // Get the rank of this process
+    int total_elements = n_elements;
+
+
+    amrex::AllPrint() << "Before if-statement: total elements = " << total_elements << " from " << rank << std::endl;
+    amrex::AllPrint() << "Before MPI_Barrier at rank " << rank << std::endl;
+    // MPI_Barrier(MPI_COMM_WORLD);
+    amrex::AllPrint() << "After MPI_Barrier at rank " << rank << std::endl;
+
+        if (rank !=0) {
+        amrex::AllPrint() << "about to send locally " << n_elements << " from " << rank << std::endl; 
+        
+        int send_status = MPI_Send(&n_elements, 1, MPI_INT, 0, 101, MPI_COMM_WORLD);
+        if (send_status != MPI_SUCCESS) {
+            amrex::AllPrint() << "Error in MPI_Isend from proc " << rank <<std::endl;
+        }
+    }
+
+    if (rank == 0){
+        for (int proc = 1; proc < num_procs; ++proc){
+            int proc_n_elements;
+            amrex::AllPrint() << "about to receive locally " << n_elements << " in " << rank << std::endl; 
+            amrex::AllPrint() << "proc: " << proc << " is sending " <<  n_elements << " in " << rank << std::endl; 
+            
+            int recv_status = MPI_Recv(&proc_n_elements, 1, MPI_INT, proc, 101, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            amrex::AllPrint() << "proc_n_elements = " << proc_n_elements << std::endl;
+            if (recv_status != MPI_SUCCESS) {
+
+                amrex::AllPrint() << "Error in MPI_Irecv from proc " << rank <<std::endl;
+            }
+
+            total_elements += proc_n_elements;
+            amrex::AllPrint() << "total elements = " << total_elements << " in process 0 " << rank << std::endl;
+        }
+    }
+//    MPI_Barrier(MPI_COMM_WORLD);
+
+    amrex::AllPrint() << "total_elements: " << total_elements << " My Rank is " << rank << std::endl;
+    // ENDING NEW EDITS;
+
+if (bx.numPts() > 0) {
+    // Processor has data to process
+    amrex::AllPrint() << "Processor " << amrex::ParallelDescriptor::MyProc()
+                   << " has n_elements = " << n_elements << std::endl;
+} else {
+    amrex::Print() << "Processor " << amrex::ParallelDescriptor::MyProc()
+                   << " has no elements to process." << std::endl;
+}
 
     // Initialize vectors to send to WW3
     std::vector<Real> magnitude_values(n_elements);
@@ -284,9 +336,6 @@ ERF::send_to_ww3 (int lev)
     indices[counter] = iv;
     ++counter;
     }
-//    timedif2 = ( ((double) clock()) / CLOCKS_PER_SEC) - clkStart2;
-//    amrex::AllPrintToFile("timer.txt") << "It took " << (double) timedif2 << " seconds to reach the part before sending" << std::endl;
-//amrex::Print() << "It took " << (double) timedif2 << " seconds to reach the part before sending" << std::endl;
 
 // Print magnitude values and corresponding IntVect indices
 for (int j = 0; j < n_elements; ++j) {
@@ -310,17 +359,19 @@ for (int j = 0; j < n_elements; ++j) {
          }
 
 
-         amrex::Print()<< "Sending " << n_elements << " from ERF::send_to_ww3 now" << std::endl;
+         amrex::AllPrint()<< "Sending " << n_elements << " from ERF::send_to_ww3 now from rank "<< rank << std::endl;
 
          if (amrex::MPMD::MyProc() == this_root) {
              if (rank_offset == 0) // First program
              {
+             amrex::AllPrint() << "Processor " << rank << " is sending to ww3" <<std::endl;
              MPI_Send(&n_elements, 1, MPI_INT, other_root, 11, MPI_COMM_WORLD);
 MPI_Send(magnitude_values.data(), n_elements, MPI_DOUBLE, other_root, 13, MPI_COMM_WORLD);
 MPI_Send(theta_values.data(), n_elements, MPI_DOUBLE, other_root, 15, MPI_COMM_WORLD);
              }
              else // Second program
              {
+             amrex::AllPrint() << "Processor " << rank << " is sending to ww3" <<std::endl;
                  MPI_Send(&n_elements, 1, MPI_INT, other_root, 10, MPI_COMM_WORLD);
 MPI_Send(magnitude_values.data(), n_elements, MPI_DOUBLE, other_root, 12, MPI_COMM_WORLD);
 MPI_Send(theta_values.data(), n_elements, MPI_DOUBLE, other_root, 14, MPI_COMM_WORLD);
@@ -329,9 +380,6 @@ MPI_Send(theta_values.data(), n_elements, MPI_DOUBLE, other_root, 14, MPI_COMM_W
              }
          }
     timedif = ( ((double) clock()) / CLOCKS_PER_SEC) - clkStart;
-
-// amrex::Real myclock = ParallelDescriptor::second();
-//    amrex::AllPrintToFile("timer.txt") << "At " << myclock << " seconds I reached the end of send_to_ww3" << std::endl;
 
      amrex::AllPrintToFile("timer.txt") << "It took " << timedif << " seconds to reach the end of send_to_WW3" << std::endl;
 

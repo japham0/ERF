@@ -265,9 +265,28 @@ ERF::init_stuff (int lev, const BoxArray& ba, const DistributionMapping& dm,
     DistributionMapping dm_onegrid(ba2d_onegrid);
     dm_onegrid.define(pmap);
 
+    amrex::AllPrint()<< "BoxArray ba_onegrid: " << ba_onegrid << std::endl;
+
+    amrex::AllPrint()<< "BoxArray ba2d_onegrid: " << ba2d_onegrid << std::endl;
+
+    amrex::AllPrint()<< "DistributionMapping dm_onegrid: " << dm_onegrid << std::endl;
+    amrex::AllPrint()<< "Pmap: "; 
+    for (int i = 0; i < pmap.size(); i++){
+        amrex::AllPrint() << pmap[i] << " ";
+        }
+    amrex::AllPrint() << std::endl;
+
+
     Hwave_onegrid[lev] = std::make_unique<MultiFab>(ba2d_onegrid,dm_onegrid,1,IntVect(1,1,0));
     Lwave_onegrid[lev] = std::make_unique<MultiFab>(ba2d_onegrid,dm_onegrid,1,IntVect(1,1,0));
 
+    amrex::AllPrint()<< "MultiFab Hwave_onegrid: " << lev << "] BoxArray: " << Hwave_onegrid[lev]->boxArray() <<  std::endl;
+    amrex::AllPrint()<< "MultiFab Lwave_onegrid: " << lev << "] BoxArray: " << Lwave_onegrid[lev]->boxArray() <<  std::endl;
+    
+    amrex::AllPrint()<< "MultiFab Hwave_onegrid: " << lev << "] DistMapping: " << Hwave_onegrid[lev]->DistributionMap() <<  std::endl;
+    amrex::AllPrint()<< "MultiFab Lwave_onegrid: " << lev << "] DistMapping: " << Lwave_onegrid[lev]->DistributionMap() <<  std::endl;
+   
+   
     BoxList bl2d_wave = ba.boxList();
     for (auto& b : bl2d_wave) {
         b.setRange(2,0);
@@ -276,10 +295,44 @@ ERF::init_stuff (int lev, const BoxArray& ba, const DistributionMapping& dm,
 
     Hwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm,1,IntVect(3,3,0));
     Lwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm,1,IntVect(3,3,0));
+    
 
+    // MY EDITS: 
+/*
+    BoxArray ba2d_wave;
+    BoxList bl2d_wave = ba.boxList();
+
+    int domain_size_x = geom[lev].Domain().length(0);
+    int split_index = domain_size_x / 2;
+
+    bl2d_wave.clear();
+    bl2d_wave.push_back(Box(IntVect(0,0,0), IntVect(split_index - 1, geom[lev].Domain().length(1) - 1, geom[lev].Domain().length(2)-1)));
+    bl2d_wave.push_back(Box(IntVect(split_index,0,0), IntVect(domain_size_x - 1, geom[lev].Domain().length(1) - 1, geom[lev].Domain().length(2)-1)));
+    
+    ba2d_wave.define(bl2d_wave);
+    for (auto& b : bl2d_wave){
+        b.setRange(2,0);
+    }
+    Vector<int> pmap_new(2);
+    pmap_new[0] = 0;
+    pmap_new[1] = 1;
+    DistributionMapping dm_new(ba2d_wave);
+    dm_new.define(pmap_new);
+    amrex::AllPrint() << "BoxArray ba2d_wave (Hwave): " << ba2d_wave <<std::endl;
+    amrex::AllPrint() << "DistributionMapping dm: " << dm_new << std::endl;
+
+    Hwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm_new,1,IntVect(3,3,0));
+    Lwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm_new,1,IntVect(3,3,0));
+*/
+    amrex::AllPrint()<< "MultiFab Hwave: " << lev << "] BoxArray: " << Hwave[lev]->boxArray() << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs() << std::endl;
+    amrex::AllPrint()<< "MultiFab Lwave: " << lev << "] BoxArray: " << Lwave[lev]->boxArray() <<  std::endl;
+
+    amrex::AllPrint()<< "MultiFab Hwave: " << lev << "] DistMapping: " << Hwave[lev]->DistributionMap() <<  std::endl;
+    amrex::AllPrint()<< "MultiFab Lwave: " << lev << "] DistMapping: " << Lwave[lev]->DistributionMap() <<  std::endl;
     std::cout<<ba_onegrid<<std::endl;
     std::cout<<ba2d_onegrid<<std::endl;
     std::cout<<dm_onegrid<<std::endl;
+
 #endif
 
 
