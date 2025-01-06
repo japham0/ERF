@@ -943,27 +943,14 @@ amrex::AllPrint() << "Processor " << amrex::ParallelDescriptor::MyProc() << " ou
 
     amrex::AllPrint() << "I AM IN ERF.cpp " << std::endl;
 
-    amrex::AllPrint() << "Before calling send_to_ww3 my rank is: " << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs() << std::endl;
-
-    amrex::AllPrint() << "About to call send_to_ww3 from ERF.cpp from processor" << amrex::ParallelDescriptor::MyProc()<< " out of " << amrex::ParallelDescriptor::NProcs() << std::endl;
-
-    send_to_ww3(lev);
-
-    amrex::AllPrint() << "JUST SENT FROM ERF.cpp " << std::endl;
-
-    amrex::AllPrint() << "Before calling read_waves the global mpi rank is: "
-                   << amrex::ParallelDescriptor::MyProc() << std::endl;
+    amrex::AllPrint() << "COMMENTING OUT send_to_ww3 my rank is: " << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs() << std::endl;
 
 
-    amrex::Print() << "About to call read_waves from ERF.cpp" << std::endl;
-    read_waves(lev);
-    // MY EDITS
-    //int lev = 0;
-    //amrex::Print() <<  " About to call send_to_ww3 from ERF.cpp" << std::endl;
-    //send_to_ww3(lev);
-    //amrex::Print() <<  " About to call read_waves from ERF.cpp"  << std::endl;
-    //read_waves(lev);
-   // send_to_ww3(lev);
+//    send_to_ww3(lev);
+
+
+    amrex::AllPrint() << "COMMENTING OUT  read_waves from ERF.cpp, my rank is: " << rank << std::endl;
+    // read_waves(lev);
 #endif
 
     // Configure ABLMost params if used MostWall boundary condition

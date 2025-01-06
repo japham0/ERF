@@ -217,6 +217,27 @@ ERF::init_stuff (int lev, const BoxArray& ba, const DistributionMapping& dm,
         b.setRange(2,0);
     }
     BoxArray ba2d_mf(std::move(bl2d_mf));
+    
+    // MY EDITS:
+    amrex::AllPrint() << "BoxArray ba2d_mf: " << ba2d_mf << std::endl;
+    amrex::AllPrint() << "DistributionMapping dm: " << std::endl;
+    amrex::AllPrint() << "Processor assignments:" << std::endl;
+    for (int i = 0; i < ba2d_mf.size(); i++) {
+        amrex::AllPrint() << "Box " << i << " is on processor: " << dm[i] << std::endl;
+    }
+
+    int myProc = amrex::MPMD::MyProc();
+    int nProcs = amrex::MPMD::NProcs();
+
+    amrex::AllPrint() << "Processor " << myProc << " out of " << nProcs << " processors." << std::endl;
+
+    for (int i = 0; i < ba2d_mf.size(); i++) {
+        if (dm[i] == myProc) {
+            amrex::AllPrint() << "Processor " << myProc << " is handling Box " << i << ": " << ba2d_mf[i] << std::endl;
+        }
+    }
+
+
 
     mapfac_m[lev] = std::make_unique<MultiFab>(ba2d_mf,dm,1,3);
     mapfac_u[lev] = std::make_unique<MultiFab>(convert(ba2d_mf,IntVect(1,0,0)),dm,1,3);
@@ -264,7 +285,7 @@ ERF::init_stuff (int lev, const BoxArray& ba, const DistributionMapping& dm,
     pmap[0]=0;
     DistributionMapping dm_onegrid(ba2d_onegrid);
     dm_onegrid.define(pmap);
-
+/*
     amrex::AllPrint()<< "BoxArray ba_onegrid: " << ba_onegrid << std::endl;
 
     amrex::AllPrint()<< "BoxArray ba2d_onegrid: " << ba2d_onegrid << std::endl;
@@ -286,7 +307,8 @@ ERF::init_stuff (int lev, const BoxArray& ba, const DistributionMapping& dm,
     amrex::AllPrint()<< "MultiFab Hwave_onegrid: " << lev << "] DistMapping: " << Hwave_onegrid[lev]->DistributionMap() <<  std::endl;
     amrex::AllPrint()<< "MultiFab Lwave_onegrid: " << lev << "] DistMapping: " << Lwave_onegrid[lev]->DistributionMap() <<  std::endl;
    
-   
+  */
+
     BoxList bl2d_wave = ba.boxList();
     for (auto& b : bl2d_wave) {
         b.setRange(2,0);
@@ -329,9 +351,9 @@ ERF::init_stuff (int lev, const BoxArray& ba, const DistributionMapping& dm,
 
     amrex::AllPrint()<< "MultiFab Hwave: " << lev << "] DistMapping: " << Hwave[lev]->DistributionMap() <<  std::endl;
     amrex::AllPrint()<< "MultiFab Lwave: " << lev << "] DistMapping: " << Lwave[lev]->DistributionMap() <<  std::endl;
-    std::cout<<ba_onegrid<<std::endl;
-    std::cout<<ba2d_onegrid<<std::endl;
-    std::cout<<dm_onegrid<<std::endl;
+  //  std::cout<<ba_onegrid<<std::endl;
+  //  std::cout<<ba2d_onegrid<<std::endl;
+  //  std::cout<<dm_onegrid<<std::endl;
 
 #endif
 

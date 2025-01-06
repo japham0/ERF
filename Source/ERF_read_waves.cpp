@@ -271,12 +271,12 @@ amrex::AllPrint() << "MPMD NProcs() = " <<  amrex::MPMD::NProcs() << std::endl;
         Box slice_box_ref = makeSlab(bx, 2, k_ref);
         n_elements += slice_box_ref.numPts();
     //}
-    
 
     int num_procs = amrex::ParallelDescriptor::NProcs(); // Get the total number of processes
     int rank = amrex::ParallelDescriptor::MyProc();      // Get the rank of this process
     int total_elements = n_elements;
 
+    amrex::AllPrint() << "n_elements from proc " << rank << " = " << n_elements << std::endl; 
 
     amrex::AllPrint() << "Before if-statement: total elements = " << total_elements << " from " << rank << std::endl;
     amrex::AllPrint() << "Before MPI_Barrier at rank " << rank << std::endl;

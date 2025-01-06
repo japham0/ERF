@@ -159,6 +159,26 @@ ABLMost::compute_fluxes (const int& lev,
         const auto Lwave_arr = (m_Lwave_lev[lev]) ? m_Lwave_lev[lev]->array(mfi) : Array4<Real> {};
         const auto eta_arr   = m_eddyDiffs_lev[lev]->array(mfi);
 
+/*
+amrex::AllPrintToFile("Hwave_ABLMost.txt");
+
+amrex::AllPrint() << "I am in ABLMost.cpp" << std::endl;
+
+if (m_Hwave_lev[lev]) {
+    amrex::AllPrint() << "Hwave_arr values: ";
+    const Box& box = mfi.validbox(); 
+    for (int i = box.smallEnd(0); i <= box.bigEnd(0); i++) { 
+        for (int j = box.smallEnd(1); j <= box.bigEnd(1); j++) { 
+            for (int k = box.smallEnd(2); k <= box.bigEnd(2); k++) { 
+                amrex::AllPrint() << Hwave_arr(i,j,k) << " "; 
+            }
+        }
+    }
+    amrex::AllPrint() << std::endl;
+} else {
+    amrex::AllPrint() << "Hwave_arr is empty." << std::endl;
+}
+*/
         auto lmask_arr    = (m_lmask_lev[lev][0])    ? m_lmask_lev[lev][0]->array(mfi) :
                                                        Array4<int> {};
 

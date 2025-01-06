@@ -245,6 +245,8 @@ struct adiabatic_wave_coupled
                   const amrex::Array4<amrex::Real>& Lwave_arr,
                   const amrex::Array4<amrex::Real>& eta_arr) const
     {
+
+
         int iter = 0;
         amrex::Real ustar = 0.0;
         amrex::Real z0    = 0.0;
@@ -261,6 +263,8 @@ struct adiabatic_wave_coupled
             u_star_arr(i,j,k) = mdata.kappa * umm_arr(i,j,k) / std::log(mdata.zref / z0);
             ++iter;
         } while ((std::abs(u_star_arr(i,j,k) - ustar) > tol) && iter <= max_iters);
+
+        amrex::AllPrint() << " I am in adiabatic with wave_coupled roughness" << std::endl;
 
         t_star_arr(i,j,k) = 0.0;
           olen_arr(i,j,k) = 1.0e16;
@@ -501,6 +505,8 @@ struct surface_flux_wave_coupled
                   const amrex::Array4<amrex::Real>& Lwave_arr,
                   const amrex::Array4<amrex::Real>& eta_arr) const
     {
+
+
         int iter = 0;
         amrex::Real ustar = 0.0;
         amrex::Real z0    = 0.0;
@@ -532,6 +538,7 @@ struct surface_flux_wave_coupled
         t_star_arr(i,j,k) = -mdata.surf_temp_flux / u_star_arr(i,j,k);
           olen_arr(i,j,k) = Olen;
            z0_arr(i,j,k)  = z0;
+        amrex::AllPrint() << " I am in surface flux with wave_coupled roughness" << std::endl;
     }
 
 private:
@@ -807,6 +814,7 @@ struct surface_temp_wave_coupled
                             (std::log(mdata.zref / z0) - psi_h);
           olen_arr(i,j,k) = Olen;
             z0_arr(i,j,k) = z0;
+        amrex::AllPrint() << " I am in surface temp with wave_coupled roughness" << std::endl;
     }
 
 private:
