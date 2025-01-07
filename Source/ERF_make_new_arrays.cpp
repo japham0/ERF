@@ -226,17 +226,6 @@ ERF::init_stuff (int lev, const BoxArray& ba, const DistributionMapping& dm,
         amrex::AllPrint() << "Box " << i << " is on processor: " << dm[i] << std::endl;
     }
 
-    int myProc = amrex::MPMD::MyProc();
-    int nProcs = amrex::MPMD::NProcs();
-
-    amrex::AllPrint() << "Processor " << myProc << " out of " << nProcs << " processors." << std::endl;
-
-    for (int i = 0; i < ba2d_mf.size(); i++) {
-        if (dm[i] == myProc) {
-            amrex::AllPrint() << "Processor " << myProc << " is handling Box " << i << ": " << ba2d_mf[i] << std::endl;
-        }
-    }
-
 
 
     mapfac_m[lev] = std::make_unique<MultiFab>(ba2d_mf,dm,1,3);
