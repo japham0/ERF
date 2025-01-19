@@ -1,5 +1,6 @@
 #include <ERF.H>
 #include <Utils.H>
+#include <AMReX_MPMD.H>
 
 using namespace amrex;
 
@@ -16,9 +17,12 @@ void
 ERF::timeStep (int lev, Real time, int /*iteration*/)
 {
 
+int num_procs = amrex::MPMD::NProcs();
+int rank = amrex::MPMD::MyProc() + 1;
+
 amrex::Print() << "I AM AT THE BEGINNING OF timeSTEP " << std::endl;
-amrex::Print() << "At the beginning of TimeStep, Processor " << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs()
-               << " checking ERF_USE_WW3_COUPLING." << std::endl;
+amrex::AllPrint() << "Global rank: " << rank << " out of " << num_procs << std::endl;
+
 if (regrid_int > 0)  // We may need to regrid
     {
         // help keep track of whether a level was already regridded
@@ -78,19 +82,10 @@ amrex::Print() << "ERF_USE_WW3_COUPLING is NOT defined." << std::endl;
 
 
 #ifdef ERF_USE_WW3_COUPLING
-    int global_rank = amrex::ParallelDescriptor::MyProc();
-
-    amrex::Print() <<  " I AM HERE " << std::endl;
-
-    amrex::Print() << "Total number of MPI ranks (ERF time_step): " << amrex::ParallelDescriptor::NProcs() << std::endl;
-    amrex::Print() << "Processor " << global_rank << " is about to call send_to_ww3." << std::endl;
-    amrex::Print() << "Before calling send_to_ww3 the global mpi rank is:" << global_rank <<std::endl;
-    
 
     amrex::Print() <<  " About to call send_to_ww3 from ERF_Timestep" << std::endl;
     send_to_ww3(lev);
 
-    amrex::Print() << "After calling send_waves the global mpi rank is:" << global_rank <<std::endl;
     amrex::Print() <<  " About to call read_waves from ERF_Timestep"  << std::endl;
     read_waves(lev);
 #endif

@@ -8,7 +8,8 @@
 
 #include <EOS.H>
 #include <ERF.H>
-
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_MPMD.H>
 #include <AMReX_buildInfo.H>
 
 #include <Utils.H>
@@ -119,7 +120,6 @@ ERF::ERF ()
 
     int nlevs_max = max_level + 1;
 
-amrex::AllPrint() << "At the beginning of ERF.cpp, Processor " << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs() << std::endl;
 #ifdef ERF_USE_WINDFARM
     Nturb.resize(nlevs_max);
     vars_windfarm.resize(nlevs_max);
@@ -931,39 +931,27 @@ ERF::InitData ()
             base_state_new[lev].FillBoundary(geom[lev].periodicity());
         }
     }
-amrex::AllPrint() << "Processor " << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs()  << " is going into ERF_USE_WW3_COUPLING." << std::endl;
 
 
 #ifdef ERF_USE_WW3_COUPLING
 
     int lev = 0;
-    int num_procs = amrex::ParallelDescriptor::NProcs();
-    int rank = amrex::ParallelDescriptor::MyProc();
-        MPI_Comm my_local_comm = MPI_COMM_NULL;  // Initialize to null
+    int num_procs = amrex::MPMD::NProcs();
+    int rank = amrex::MPMD::MyProc() + 1;
 
     amrex::AllPrint() << "I AM IN ERF.cpp " << std::endl;
 
-    amrex::AllPrint() << "Before calling send_to_ww3 my rank is: " << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs() << std::endl;
-
-    amrex::AllPrint() << "About to call send_to_ww3 from ERF.cpp from processor" << amrex::ParallelDescriptor::MyProc()<< " out of " << amrex::ParallelDescriptor::NProcs() << std::endl;
-
+    amrex::AllPrint() << "Global rank: " << rank << " out of " << num_procs << std::endl;
+    
     send_to_ww3(lev);
 
     amrex::AllPrint() << "JUST SENT FROM ERF.cpp " << std::endl;
 
-    amrex::AllPrint() << "Before calling read_waves the global mpi rank is: "
-                   << amrex::ParallelDescriptor::MyProc() << std::endl;
-
-
     amrex::Print() << "About to call read_waves from ERF.cpp" << std::endl;
+    
     read_waves(lev);
-    // MY EDITS
-    //int lev = 0;
-    //amrex::Print() <<  " About to call send_to_ww3 from ERF.cpp" << std::endl;
-    //send_to_ww3(lev);
-    //amrex::Print() <<  " About to call read_waves from ERF.cpp"  << std::endl;
-    //read_waves(lev);
-   // send_to_ww3(lev);
+
+
 #endif
 
     // Configure ABLMost params if used MostWall boundary condition

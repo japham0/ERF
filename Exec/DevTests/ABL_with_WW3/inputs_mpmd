@@ -6,8 +6,8 @@ amrex.fpe_trap_invalid = 0
 fabarray.mfiter_tile_size = 1024 1024 1024
 
 # PROBLEM SIZE & GEOMETRY
-geometry.prob_extent =  41     41     1024
-amr.n_cell           =  41     41        4
+geometry.prob_extent =  1025000     1025000     1024
+amr.n_cell           =  41     41        10
 
 geometry.is_periodic = 1 1 0
 

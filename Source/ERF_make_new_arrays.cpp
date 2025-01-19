@@ -11,6 +11,7 @@
 #include <ERF.H>
 
 #include <AMReX_buildInfo.H>
+#include <AMReX_MPMD.H>
 
 #include <Utils.H>
 #include <TerrainMetrics.H>
@@ -324,7 +325,10 @@ ERF::init_stuff (int lev, const BoxArray& ba, const DistributionMapping& dm,
     Hwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm_new,1,IntVect(3,3,0));
     Lwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm_new,1,IntVect(3,3,0));
 */
-    amrex::AllPrint()<< "MultiFab Hwave: " << lev << "] BoxArray: " << Hwave[lev]->boxArray() << amrex::ParallelDescriptor::MyProc() << " out of " << amrex::ParallelDescriptor::NProcs() << std::endl;
+    int num_procs = amrex::MPMD::NProcs();
+    int rank = amrex::MPMD::MyProc() + 1;
+
+    amrex::AllPrint()<< "MultiFab Hwave: " << lev << "] BoxArray: " << Hwave[lev]->boxArray() << rank << " out of " << num_procs << std::endl;
     amrex::AllPrint()<< "MultiFab Lwave: " << lev << "] BoxArray: " << Lwave[lev]->boxArray() <<  std::endl;
 
     amrex::AllPrint()<< "MultiFab Hwave: " << lev << "] DistMapping: " << Hwave[lev]->DistributionMap() <<  std::endl;
