@@ -9,7 +9,7 @@
 #include "prob_common.H"
 #include <EOS.H>
 #include <ERF.H>
-
+#include <AMReX_MPMD.H>
 #include <AMReX_buildInfo.H>
 
 #include <Utils.H>
@@ -254,28 +254,56 @@ ERF::init_stuff (int lev, const BoxArray& ba, const DistributionMapping& dm,
 #ifdef ERF_USE_WW3_COUPLING
     // create a new BoxArray and DistributionMapping for a MultiFab with 1 box
     BoxArray ba_onegrid(geom[lev].Domain());
+
+    // amrex::AllPrint() << " ba_onegrid: " << ba_onegrid << " rank: " << amrex::MPMD::MyProc() << std::endl;
+
     BoxList bl2d_onegrid = ba_onegrid.boxList();
+    /*
+    amrex::Print() << "bl2d_onegrid BEFORE:" << std::endl;
+for (const auto& b : bl2d_onegrid) {
+    amrex::Print() << b << std::endl;
+}
+*/
     for (auto& b : bl2d_onegrid) {
         b.setRange(2,0);
     }
+
+    //amrex::Print() << "Modified bl2d_onegrid (2D):" << std::endl;
+/*for (const auto& b : bl2d_onegrid) {
+    amrex::Print() << b << std::endl; 
+}*/
+
+
     BoxArray ba2d_onegrid(std::move(bl2d_onegrid));
+    //amrex::AllPrint() << "ba2d_onegrid (modified bl2d_onegrid):" << ba2d_onegrid << std::endl;
+
     Vector<int> pmap;
     pmap.resize(1);
     pmap[0]=0;
     DistributionMapping dm_onegrid(ba2d_onegrid);
+
+    //amrex::Print() << "dm_onegrid (DistributionMapping):" << std::endl;
+    
     dm_onegrid.define(pmap);
 
+/*for (int i = 0; i < dm_onegrid.size(); ++i) {
+    amrex::AllPrint() << "distribution map size: " << dm_onegrid.size();
+    amrex::AllPrint() << "Box " << i << " assigned to process " << dm_onegrid[i] << "my rank is: " << amrex::MPMD::MyProc() << std::endl;
+}*/
     Hwave_onegrid[lev] = std::make_unique<MultiFab>(ba2d_onegrid,dm_onegrid,1,IntVect(1,1,0));
     Lwave_onegrid[lev] = std::make_unique<MultiFab>(ba2d_onegrid,dm_onegrid,1,IntVect(1,1,0));
 
     BoxList bl2d_wave = ba.boxList();
     for (auto& b : bl2d_wave) {
         b.setRange(2,0);
+        // amrex::AllPrint() << "bl2d_wave: " << b << std::endl;
     }
     BoxArray ba2d_wave(std::move(bl2d_wave));
+    //amrex::AllPrint() << "ba2d_wave (from modified bl2d_wave):" << std::endl;
+    //amrex::AllPrint() << ba2d_wave << std::endl;
 
-    Hwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm,1,IntVect(3,3,0));
-    Lwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm,1,IntVect(3,3,0));
+    Hwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm, 1,IntVect(3,3,0));
+    Lwave[lev] = std::make_unique<MultiFab>(ba2d_wave,dm, 1,IntVect(3,3,0));
 
     std::cout<<ba_onegrid<<std::endl;
     std::cout<<ba2d_onegrid<<std::endl;

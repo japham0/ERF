@@ -17,20 +17,18 @@ using namespace amrex;
 void
 ERF::read_waves (int lev)
 {
-         double clkStart, timedif;
-         clkStart = (double) clock() / CLOCKS_PER_SEC;
-
     for ( MFIter mfi(*Hwave_onegrid[lev],false); mfi.isValid(); ++mfi)
     {
 
          const auto & bx = mfi.validbox();
 
-         amrex::Print() <<  " Just called ERF::read_waves to receive from WW3 " << bx << std::endl;
+         //amrex::Print() <<  " Just called ERF::read_waves to receive from WW3 " << bx << std::endl;
          amrex::Array4<Real> my_H_arr = Hwave_onegrid[lev]->array(mfi);
          amrex::Array4<Real> my_L_arr = Lwave_onegrid[lev]->array(mfi);
 
          Real* my_H_ptr = my_H_arr.dataPtr();
          Real* my_L_ptr = my_L_arr.dataPtr();
+         
 
          int rank_offset = amrex::MPMD::MyProc() - amrex::ParallelDescriptor::MyProc();
          int this_root, other_root;
@@ -59,8 +57,8 @@ ERF::read_waves (int lev)
                  MPI_Recv(&ny, 1, MPI_INT, other_root, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
              }
              //This may not be necessary
-             ParallelDescriptor::Bcast(&nx, 1);
-             ParallelDescriptor::Bcast(&ny, 1);
+             //ParallelDescriptor::Bcast(&nx, 1);
+             //ParallelDescriptor::Bcast(&ny, 1);
          }
 
          if((nx)*(ny) > 0) {
@@ -76,27 +74,115 @@ ERF::read_waves (int lev)
                  {
                      MPI_Recv(my_H_ptr, nsealm, MPI_DOUBLE, other_root, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                      MPI_Recv(my_L_ptr, nsealm, MPI_DOUBLE, other_root, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                 }
+                     amrex::PrintToFile("output_HS_cpp.txt")<<FArrayBox(my_H_arr)<<std::endl;
+                    amrex::PrintToFile("output_L_cpp.txt")<<FArrayBox(my_L_arr)<<std::endl;
+                    //amrex::Print() << "NSEALM: " << nsealm << std::endl;
+                }
              }
-
-             amrex::AllPrintToFile("output_HS_cpp.txt")<<FArrayBox(my_H_arr)<<std::endl;
-             amrex::AllPrintToFile("output_L_cpp.txt")<<FArrayBox(my_L_arr)<<std::endl;
 
          }
     }
 
 
-         amrex::Print() <<  " Just called received HS and LM from WW3 "  << std::endl;
-    //May need to be Redistribute
-    //    ParallelCopy(Hwave[lev],Hwave_onegrid[lev],0,0,1,0);
-    Hwave[lev]->ParallelCopy(*Hwave_onegrid[lev]);
-    Hwave[lev]->FillBoundary(geom[lev].periodicity());
-    Lwave[lev]->ParallelCopy(*Lwave_onegrid[lev]);
-    Lwave[lev]->FillBoundary(geom[lev].periodicity());
-    amrex::Print() << "HWAVE BOX " << (*Hwave[lev])[0].box() << std::endl;
 
+// START
+    int ioproc = ParallelDescriptor::IOProcessorNumber();
+
+    const Box& bx = Hwave_onegrid[lev]->boxArray()[0];  // Single box in Hwave_onegrid[lev]
+    int nx = bx.length(0);
+    int ny = bx.length(1);
+    std::vector<amrex::Real> temp_bufferH(nx * ny, 1.0);
+    std::vector<amrex::Real> temp_bufferL(nx * ny, 1.0);
+    //amrex::AllPrint() << " NX ,NY: " << nx << " " << ny << std::endl; 
+    //amrex::AllPrint() << "temp_bufferH size:" << temp_bufferH.size() << " from rank " << amrex::ParallelDescriptor::MyProc() << std::endl; 
+    //amrex::AllPrint() << " temp_buffer size: " << temp_buffer.size() << " my rank is " << amrex::MPMD::MyProc()<<std::endl; 
+   
+
+    for (MFIter mfi(*Hwave_onegrid[lev]); mfi.isValid(); ++mfi) {
+        const Array4<Real const>& arr_onegridH = Hwave_onegrid[lev]->const_array(mfi);
+        int index = 0;
+        for (int i = 0; i < nx; ++i) {
+            for (int j = 0; j < ny; ++j) {
+                    temp_bufferH[index++] = arr_onegridH(i, j, 0);
+            }
+        }
+    }
+    for (MFIter mfi(*Lwave_onegrid[lev]); mfi.isValid(); ++mfi) {
+        const Array4<Real const>& arr_onegridL = Lwave_onegrid[lev]->const_array(mfi);
+        int index = 0;
+        for (int i = 0; i < nx; ++i) {
+            for (int j = 0; j < ny; ++j) {
+                    temp_bufferL[index++] = arr_onegridL(i, j, 0);
+            }
+        }
+    }
+
+    ParallelDescriptor::Barrier();
+
+    amrex::ParallelDescriptor::Bcast(temp_bufferH.data(), temp_bufferH.size(), 0);
+
+    ParallelDescriptor::Barrier();
+    amrex::ParallelDescriptor::Bcast(temp_bufferL.data(), temp_bufferL.size(), 0);
+    /*
+    for (int i = 0; i < 5; ++i){
+        amrex::AllPrint() << "temp_buffer from rank " << amrex::ParallelDescriptor::MyProc() << " (after) " << temp_bufferH[i] << std::endl;
+    }
+    */
+
+    ParallelDescriptor::Barrier();
+
+
+for (MFIter mfi(*Hwave[lev]); mfi.isValid(); ++mfi) {
+    const Box& bx = mfi.validbox();
+    const Array4<Real>& arr_hwave = Hwave[lev]->array(mfi);
+
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+        // Calculate the global index for the temp_buffer
+        int index = (i - bx.smallEnd(0)) + (j - bx.smallEnd(1)) * (bx.bigEnd(0) - bx.smallEnd(0) + 1);
+        Real valueH = temp_bufferH[index];
+        IntVect iv(i, j, k);
+            /*
+            amrex::AllPrint() << "Proc " << amrex::ParallelDescriptor::MyProc() 
+                      << ", IntVect: " << iv 
+                      << ", value: " << valueH << std::endl;
+            */
+        // Assign value from temp_buffer to the corresponding element in Hwave[lev]
+        arr_hwave(i, j, 0) = valueH;
+    });
+}
+    Hwave[lev]->FillBoundary(geom[lev].periodicity());
+
+for (MFIter mfi(*Lwave[lev]); mfi.isValid(); ++mfi) {
+    const Box& bx = mfi.validbox();
+    const Array4<Real>& arr_lwave = Lwave[lev]->array(mfi);
+
+    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+        int index = (i - bx.smallEnd(0)) + (j - bx.smallEnd(1)) * (bx.bigEnd(0) - bx.smallEnd(0) + 1);
+        Real valueL = temp_bufferL[index];
+        arr_lwave(i, j, 0) = valueL;
+
+    });
+}
+
+    Lwave[lev]->FillBoundary(geom[lev].periodicity());
+    ParallelDescriptor::Barrier();
+//Lwave[lev]->FillBoundary(geom[lev].periodicity());
+//Hwave[lev]->FillBoundary(geom[lev].periodicity());
+// END
+
+
+
+   // Hwave[lev]->ParallelCopy(*Hwave_onegrid[lev]);
+   // Lwave[lev]->ParallelCopy(*Lwave_onegrid[lev]);
+
+    //Lwave[lev]->FillBoundary(geom[lev].periodicity());
+    //Hwave[lev]->FillBoundary(geom[lev].periodicity());
+  //  amrex::Print() << "HWAVE BOX " << (*Hwave[lev])[0].box() << std::endl;
+    
     for (MFIter mfi(*Hwave[lev],TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         Box bx = mfi.tilebox();
+
+
         const Array4<Real const>& Hwave_arr = Hwave[lev]->const_array(mfi);
         const Array4<int>& Lmask_arr = lmask_lev[lev][0]->array(mfi);
         ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k){
@@ -105,15 +191,18 @@ ERF::read_waves (int lev)
              } else {
                 Lmask_arr(i,j,k) = 0;
             }
+            /*
+            IntVect iv(i, j, k);
+                int value = Lmask_arr(i,j,k);
+                amrex::Print() << "Proc " << amrex::ParallelDescriptor::MyProc()
+                               << ", Index: " << iv << ", Lmask_arr = "
+                               << value << std::endl;
+            */                   
         });
     }
-         //    amrex::Real myclock = ParallelDescriptor::second();
+    
 
-        //     amrex::AllPrintToFile("timer.txt") << "At " << myclock << " seconds, I reached the end of read_waves" << std::endl;
 
-    timedif = ( ((double) clock()) / CLOCKS_PER_SEC) - clkStart;
-
-     amrex::AllPrintToFile("timer.txt") << "It took " << timedif << " seconds to reach the end of read_waves" << std::endl;
 }
 
 void
@@ -130,36 +219,12 @@ ERF::send_to_ww3 (int lev)
     if (dz < 10){
         k_ref = std::floor( (10 / dz) - 0.5 );
     }
-    double clkStart, timedif;
-    clkStart = (double) clock() / CLOCKS_PER_SEC;
 
     // Access xvel, yvel from ABL
     MultiFab xvel_data(lev_new[Vars::xvel].boxArray(), lev_new[Vars::xvel].DistributionMap(), 1, lev_new[Vars::xvel].nGrowVect());
 
     MultiFab yvel_data(lev_new[Vars::yvel].boxArray(), lev_new[Vars::yvel].DistributionMap(), 1, lev_new[Vars::yvel].nGrowVect());
 
-/*
-    BoxArray ba_onegrid(geom[lev].Domain());
-    BoxList bl2d = ba.boxList();
-    Real* theta_ptr = &theta(domlo);
-    for (auto& b : bl2d) {
-        b.setRange(2,0);
-    }
-    BoxArray ba2d(std::move(bl2d));
-
-    // create a new BoxArray and DistributionMapping for a MultiFab with 1 box
-    BoxArray ba_onegrid(lev_new[Vars::cons].boxArray());
-    BoxList bl2d_onegrid = ba_onegrid.boxList();
-    for (auto& b : bl2d_onegrid) {
-        b.setRange(2,0);
-    }
-    BoxArray ba2d_onegrid(std::move(bl2d_onegrid));
-    Vector<int> pmap;
-    pmap.resize(1);
-    pmap[0]=0;
-    DistributionMapping dm_onegrid(ba2d_onegrid);
-    dm_onegrid.define(pmap);
-*/
 
     // Make local copy of xvel, yvel
     MultiFab::Copy (xvel_data, lev_new[Vars::xvel], 0, 0, 1, lev_new[Vars::xvel].nGrowVect());
@@ -210,6 +275,26 @@ ERF::send_to_ww3 (int lev)
     }
 
 
+// START
+
+    int num_procs = amrex::MPMD::NProcs();  // Total number of processors
+    int num_procs_local = amrex::ParallelDescriptor::NProcs();
+    int rank = amrex::MPMD::MyProc();       // Current processor rank
+
+    int rank_offset = amrex::MPMD::MyProc() - amrex::ParallelDescriptor::MyProc();         
+    int this_root, other_root;
+         if (rank_offset == 0) { // First program
+             this_root = 0;
+             other_root = amrex::ParallelDescriptor::NProcs();
+         } else {
+             this_root = rank_offset;
+             other_root = 0;
+         }
+
+    std::vector<amrex::Real> k_ref_vals;
+    std::vector<amrex::Real> theta_values;
+    std::vector<amrex::Real> magnitude_values;
+
     for (MFIter mfi(u_mag, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
 
         Box bx = mfi.tilebox();
@@ -221,23 +306,7 @@ ERF::send_to_ww3 (int lev)
         amrex::Vector<std::unique_ptr<amrex::MultiFab>> magnitude_onegrid;
         amrex::Vector<std::unique_ptr<amrex::MultiFab>> theta_onegrid;
 
-
- // create a new BoxArray and DistributionMapping for a MultiFab with 1 box
-    BoxArray ba_onegrid(geom[lev].Domain());
-    BoxList bl2d_onegrid = ba_onegrid.boxList();
-    for (auto& b : bl2d_onegrid) {
-        b.setRange(2,0);
-    }
-    BoxArray ba2d_onegrid(std::move(bl2d_onegrid));
-    Vector<int> pmap;
-    pmap.resize(1);
-    pmap[0]=0;
-    DistributionMapping dm_onegrid(ba2d_onegrid);
-    dm_onegrid.define(pmap);
-
         ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k){
-
- //           magnitude(i,j,k)  = std::sqrt( pow(u(i,j,k), 2) + pow(v(i,j,k), 2) );
 
             double u_val = u(i, j, k);
             double v_val = v(i, j, k);
@@ -259,84 +328,109 @@ ERF::send_to_ww3 (int lev)
 
 
             amrex::AllPrintToFile("mag_theta.txt") << amrex::IntVect(i,j,k) <<  " Magnitude: " << magnitude(i,j,k) << " Theta: " << theta(i,j,k) <<std::endl;
-  });
+            });
 
+            // Fill k_ref_vals
+            for (amrex::BoxIterator bi(bx); bi.ok(); ++bi){
+                amrex::IntVect iv = bi();
+                if (iv[2] == k_ref){
+                    //amrex::AllPrint() << iv << ": " << magnitude(iv) << " rank: " << rank << std::endl;
+                    magnitude_values.push_back(magnitude(iv));
+                    theta_values.push_back(theta(iv));
+                }
+            }
+            //amrex::AllPrint() << "Size of k_ref_vals: " << magnitude_values.size() << "rank: " << rank << std::endl;
+}
 
-    // Send the 2D slice at k_ref
-        // Box slice_box = bx;
-        amrex::IntVect boxSmall = bx.smallEnd();
-        amrex::IntVect boxBig = bx.bigEnd();
-        Box slice_box_ref = makeSlab(bx, 2, k_ref);
+            int local_size = magnitude_values.size();
+            int total_size = 0;
+            amrex::Vector<amrex::Real> gathered_mags;
+            amrex::Vector<amrex::Real> gathered_thetas;
 
-    // Calculate the number of elements in the current box
-    int n_elements = slice_box_ref.numPts();
+            amrex::Vector<int> local_sizes(num_procs_local);
+            amrex::ParallelDescriptor::Gather(&local_size, 1, local_sizes.data(), 1, 0);
 
-    // Initialize vectors to send to WW3
-    std::vector<Real> magnitude_values(n_elements);
-    std::vector<Real> theta_values(n_elements);
-    std::vector<amrex::IntVect> indices(n_elements);
-    // Copy values
-    int counter = 0;
-    for (BoxIterator bi(slice_box_ref); bi.ok(); ++bi) {
-    IntVect iv = bi();
-    magnitude_values[counter] = magnitude(iv);
-    theta_values[counter] = theta(iv);
-    indices[counter] = iv;
-    ++counter;
-    }
-//    timedif2 = ( ((double) clock()) / CLOCKS_PER_SEC) - clkStart2;
-//    amrex::AllPrintToFile("timer.txt") << "It took " << (double) timedif2 << " seconds to reach the part before sending" << std::endl;
-//amrex::Print() << "It took " << (double) timedif2 << " seconds to reach the part before sending" << std::endl;
+            //amrex::AllPrint() << "My Local Size is " << local_size << " rank is " << rank << " local_sizes vector len" << local_sizes.size()<<  std::endl;    
 
-// Print magnitude values and corresponding IntVect indices
-for (int j = 0; j < n_elements; ++j) {
+            if (amrex::ParallelDescriptor::MyProc() == 0) {
+                /*
+                amrex::Print()<<"Local sizes after gather: ";
+                for (int i = 0; i < num_procs_local; ++i){
+                    amrex::Print() << local_sizes[i] << " ";
+                }
+                amrex::Print()<<std::endl;
+                */
+                for (int i = 0; i < num_procs_local; ++i){
+                    total_size += local_sizes[i];
+                }
+                
+                gathered_mags.resize(total_size);
+                gathered_thetas.resize(total_size);
+            }
+
+            amrex::ParallelDescriptor::Bcast(&total_size, 1, 0);
+            
+            amrex::Vector<int> displacements(num_procs_local,0);
+            if (amrex::ParallelDescriptor::MyProc() == 0){
+                int displacement = 0;
+                for (int i = 0; i < num_procs_local; ++i){
+                    displacements[i] = displacement;
+                    displacement += local_sizes[i];
+                }
+            }
+            /*
+            amrex::Print() << "DISPLACEMENT: ";
+            for (int i = 0; i < displacements.size(); ++i){
+                amrex::Print() << displacements[i] << " " << std::endl;
+            }
+
+            amrex::Print() << "DISPLACEMENTS SIZE: " << displacements.size();
+            */
+
+            amrex::ParallelDescriptor::Gatherv(magnitude_values.data(), local_size, gathered_mags.data(), local_sizes, displacements, 0);
+            amrex::ParallelDescriptor::Gatherv(theta_values.data(), local_size, gathered_thetas.data(), local_sizes, displacements, 0);
+           /* 
+            amrex::Print() << "Gathered magnitude values: ";
+            for (int i = 0; i < gathered_mags.size(); ++i){
+                amrex::Print() << gathered_mags[i] << " ";
+            }
+            amrex::Print() << " My rank is " << rank << " and there are " << gathered_mags.size() << " elements." << std::endl;
+
+            amrex::Print() << "Gathered theta values: ";
+            for (int i = 0; i < gathered_thetas.size(); ++i){
+                amrex::Print() << gathered_thetas[i] << " ";
+            }
+            amrex::Print() << " My rank is " << rank << " and there are " << gathered_mags.size() << " elements." << std::endl;
+        */
+
+        if (amrex::ParallelDescriptor::MyProc()==0){
+        for (int j = 0; j < total_size; ++j) {
     amrex::AllPrintToFile("debug_send.txt")
         << "dz, k_ref " << dz << ", " << k_ref << " "
-        << "Index: " << j
-        << ", IntVect: (" << indices[j][0] << ", " << indices[j][1] << ", " << indices[j][2] << ")"
-        << ", Magnitude: " << magnitude_values[j]
-        << ", Theta: " << theta_values[j]
+        //<< "Index: " << j
+        //<< ", IntVect: (" << indices[j][0] << ", " << indices[j][1] << ", " << indices[j][2] << ")"
+        << ", Magnitude: " << gathered_mags[j]
+        << ", Theta: " << gathered_thetas[j]
         << std::endl;
 }
 
-         int rank_offset = amrex::MPMD::MyProc() - amrex::ParallelDescriptor::MyProc();
-         int this_root, other_root;
-         if (rank_offset == 0) { // First program
-             this_root = 0;
-             other_root = amrex::ParallelDescriptor::NProcs();
-         } else {
-             this_root = rank_offset;
-             other_root = 0;
-         }
+        }
+        
 
-
-         amrex::Print()<< "Sending " << n_elements << " from ERF::send_to_ww3 now" << std::endl;
-
-         if (amrex::MPMD::MyProc() == this_root) {
-             if (rank_offset == 0) // First program
-             {
-             MPI_Send(&n_elements, 1, MPI_INT, other_root, 11, MPI_COMM_WORLD);
-MPI_Send(magnitude_values.data(), n_elements, MPI_DOUBLE, other_root, 13, MPI_COMM_WORLD);
-MPI_Send(theta_values.data(), n_elements, MPI_DOUBLE, other_root, 15, MPI_COMM_WORLD);
+             if (amrex::MPMD::MyProc() == this_root) {
+                if (rank_offset == 0) // First program
+                {
+                    MPI_Send(&total_size, 1, MPI_INT, other_root, 11, MPI_COMM_WORLD);
+                    MPI_Send(magnitude_values.data(), total_size, MPI_DOUBLE, other_root, 13, MPI_COMM_WORLD);
+                    MPI_Send(theta_values.data(), total_size, MPI_DOUBLE, other_root, 15, MPI_COMM_WORLD);
              }
              else // Second program
              {
-                 MPI_Send(&n_elements, 1, MPI_INT, other_root, 10, MPI_COMM_WORLD);
-MPI_Send(magnitude_values.data(), n_elements, MPI_DOUBLE, other_root, 12, MPI_COMM_WORLD);
-MPI_Send(theta_values.data(), n_elements, MPI_DOUBLE, other_root, 14, MPI_COMM_WORLD);
-                 //MPI_Recv(&nx, 1, MPI_INT, other_root, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                 //MPI_Recv(&ny, 1, MPI_INT, other_root, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-             }
+                    MPI_Send(&total_size, 1, MPI_INT, other_root, 10, MPI_COMM_WORLD);
+                    MPI_Send(magnitude_values.data(), total_size, MPI_DOUBLE, other_root, 12, MPI_COMM_WORLD);
+                    MPI_Send(theta_values.data(), total_size, MPI_DOUBLE, other_root, 14, MPI_COMM_WORLD);
+            }
          }
-    timedif = ( ((double) clock()) / CLOCKS_PER_SEC) - clkStart;
-
-// amrex::Real myclock = ParallelDescriptor::second();
-//    amrex::AllPrintToFile("timer.txt") << "At " << myclock << " seconds I reached the end of send_to_ww3" << std::endl;
-
-     amrex::AllPrintToFile("timer.txt") << "It took " << timedif << " seconds to reach the end of send_to_WW3" << std::endl;
-
-
-}
 
 }
 #endif
