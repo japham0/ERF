@@ -25,7 +25,9 @@ ERF::read_waves (int lev)
          //amrex::Print() <<  " Just called ERF::read_waves to receive from WW3 " << bx << std::endl;
          amrex::Array4<Real> my_H_arr = Hwave_onegrid[lev]->array(mfi);
          amrex::Array4<Real> my_L_arr = Lwave_onegrid[lev]->array(mfi);
-
+        amrex::Print() << "my Valid box: (orig) ("
+               << bx.smallEnd(0) << ", " << bx.smallEnd(1) << ") to ("
+               << bx.bigEnd(0) << ", " << bx.bigEnd(1) << ")" << std::endl;
          Real* my_H_ptr = my_H_arr.dataPtr();
          Real* my_L_ptr = my_L_arr.dataPtr();
          
@@ -93,7 +95,7 @@ ERF::read_waves (int lev)
     int ny = bx.length(1);
     std::vector<amrex::Real> temp_bufferH(nx * ny, 1.0);
     std::vector<amrex::Real> temp_bufferL(nx * ny, 1.0);
-    //amrex::AllPrint() << " NX ,NY: " << nx << " " << ny << std::endl; 
+    amrex::AllPrint() << " NX ,NY: " << nx << " " << ny << std::endl; 
     //amrex::AllPrint() << "temp_bufferH size:" << temp_bufferH.size() << " from rank " << amrex::ParallelDescriptor::MyProc() << std::endl; 
     //amrex::AllPrint() << " temp_buffer size: " << temp_buffer.size() << " my rank is " << amrex::MPMD::MyProc()<<std::endl; 
    
@@ -101,8 +103,13 @@ ERF::read_waves (int lev)
     for (MFIter mfi(*Hwave_onegrid[lev]); mfi.isValid(); ++mfi) {
         const Array4<Real const>& arr_onegridH = Hwave_onegrid[lev]->const_array(mfi);
         int index = 0;
-        for (int i = 0; i < nx; ++i) {
-            for (int j = 0; j < ny; ++j) {
+        const Box& bx = mfi.validbox();
+        amrex::Print() << "my Valid box: ("
+               << bx.smallEnd(0) << ", " << bx.smallEnd(1) << ") to ("
+               << bx.bigEnd(0) << ", " << bx.bigEnd(1) << ")" << std::endl;
+        for (int j = 0; j < ny; ++j) {
+            for (int i = 0; i < nx; ++i) {
+                    amrex::AllPrintToFile("debug_index.txt")<< index << " i, j: "<< i << ", " << j << " j "<< arr_onegridH(i, j, 0)<<std::endl;
                     temp_bufferH[index++] = arr_onegridH(i, j, 0);
             }
         }
@@ -110,8 +117,9 @@ ERF::read_waves (int lev)
     for (MFIter mfi(*Lwave_onegrid[lev]); mfi.isValid(); ++mfi) {
         const Array4<Real const>& arr_onegridL = Lwave_onegrid[lev]->const_array(mfi);
         int index = 0;
-        for (int i = 0; i < nx; ++i) {
-            for (int j = 0; j < ny; ++j) {
+        for (int j = 0; j < ny; ++j) {
+            for (int i = 0; i < nx; ++i) {
+                    amrex::AllPrintToFile("debug_indexL.txt")<< index << " i, j: "<< i << ", " << j << " j "<< arr_onegridL(i, j, 0)<<std::endl;
                     temp_bufferL[index++] = arr_onegridL(i, j, 0);
             }
         }
@@ -123,31 +131,52 @@ ERF::read_waves (int lev)
 
     ParallelDescriptor::Barrier();
     amrex::ParallelDescriptor::Bcast(temp_bufferL.data(), temp_bufferL.size(), 0);
-    /*
-    for (int i = 0; i < 5; ++i){
-        amrex::AllPrint() << "temp_buffer from rank " << amrex::ParallelDescriptor::MyProc() << " (after) " << temp_bufferH[i] << std::endl;
+    
+    for (int i = 0; i < 25; ++i){
+        amrex::Print() << i << " temp_buffer from rank " << amrex::ParallelDescriptor::MyProc() << " (after) " << temp_bufferH[i] << std::endl;
     }
-    */
+    
 
     ParallelDescriptor::Barrier();
-
+    amrex::Print() << " temp_bufferH.size: " << temp_bufferH.size() << std::endl;
 
 for (MFIter mfi(*Hwave[lev]); mfi.isValid(); ++mfi) {
     const Box& bx = mfi.validbox();
     const Array4<Real>& arr_hwave = Hwave[lev]->array(mfi);
 
+    const Geometry& geom_at_level = geom[lev];
+    const Box& domain_box = geom_at_level.Domain();
+    int NX = domain_box.length(0);
+    int NY = domain_box.length(1);
+    amrex::AllPrint() << " BIG NX ,NY: " << nx << " " << ny <<" my rank is " << amrex::ParallelDescriptor::MyProc()<< std::endl;
+    
+    int nx = bx.length(0);
+    int ny = bx.length(1);
+    amrex::AllPrint() << " small nx ,ny: " << nx << " " << ny <<" my rank is " << amrex::ParallelDescriptor::MyProc()<< std::endl;
+    amrex::AllPrint() << " arr_hwave size: " << arr_hwave.size() << " my rank is " << amrex::ParallelDescriptor::MyProc()<< std::endl;
+    amrex::AllPrint() << "my Valid box: (" 
+               << bx.smallEnd(0) << ", " << bx.smallEnd(1) << ") to ("
+               << bx.bigEnd(0) << ", " << bx.bigEnd(1) << ")" <<  " my rank is " << amrex::ParallelDescriptor::MyProc() << std::endl;
+    
+
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
         // Calculate the global index for the temp_buffer
-        int index = (i - bx.smallEnd(0)) + (j - bx.smallEnd(1)) * (bx.bigEnd(0) - bx.smallEnd(0) + 1);
+        
+        int index = i + j * NX;
         Real valueH = temp_bufferH[index];
         IntVect iv(i, j, k);
-            /*
-            amrex::AllPrint() << "Proc " << amrex::ParallelDescriptor::MyProc() 
+
+        amrex::AllPrintToFile("check_temp.txt") << "Proc " << amrex::ParallelDescriptor::MyProc()
                       << ", IntVect: " << iv 
-                      << ", value: " << valueH << std::endl;
-            */
+                      << ", index: " << index 
+                      << ", value: " << temp_bufferH[index] << std::endl;
+            
         // Assign value from temp_buffer to the corresponding element in Hwave[lev]
         arr_hwave(i, j, 0) = valueH;
+
+        amrex::AllPrintToFile("arrH.txt") << "Proc " << amrex::ParallelDescriptor::MyProc()
+                      << ", IntVect: " << iv
+                      << ", value: " << valueH << std::endl;
     });
 }
     Hwave[lev]->FillBoundary(geom[lev].periodicity());
@@ -155,22 +184,34 @@ for (MFIter mfi(*Hwave[lev]); mfi.isValid(); ++mfi) {
 for (MFIter mfi(*Lwave[lev]); mfi.isValid(); ++mfi) {
     const Box& bx = mfi.validbox();
     const Array4<Real>& arr_lwave = Lwave[lev]->array(mfi);
+    
+    const Geometry& geom_at_level = geom[lev];
+    const Box& domain_box = geom_at_level.Domain();
+    int NX = domain_box.length(0);
+    int NY = domain_box.length(1);
+
+    int nx = bx.length(0);
+    int ny = bx.length(1);
 
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-        int index = (i - bx.smallEnd(0)) + (j - bx.smallEnd(1)) * (bx.bigEnd(0) - bx.smallEnd(0) + 1);
+        
+        int index = i + j * NX;
         Real valueL = temp_bufferL[index];
         arr_lwave(i, j, 0) = valueL;
+        IntVect iv(i,j,k);
+
+        amrex::AllPrintToFile("arrL.txt") << "Proc " << amrex::ParallelDescriptor::MyProc()
+                      << ", IntVect: " << iv
+                      << ", value: " << valueL << std::endl;
 
     });
 }
 
     Lwave[lev]->FillBoundary(geom[lev].periodicity());
     ParallelDescriptor::Barrier();
-//Lwave[lev]->FillBoundary(geom[lev].periodicity());
-//Hwave[lev]->FillBoundary(geom[lev].periodicity());
+
+    amrex::AllPrint() << "MADE IT PAST THE BARRIER" << std::endl;
 // END
-
-
 
    // Hwave[lev]->ParallelCopy(*Hwave_onegrid[lev]);
    // Lwave[lev]->ParallelCopy(*Lwave_onegrid[lev]);
@@ -186,22 +227,24 @@ for (MFIter mfi(*Lwave[lev]); mfi.isValid(); ++mfi) {
         const Array4<Real const>& Hwave_arr = Hwave[lev]->const_array(mfi);
         const Array4<int>& Lmask_arr = lmask_lev[lev][0]->array(mfi);
         ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k){
+
+            IntVect iv(i,j,k);
+             //   amrex::Print() << "Hwave_arr (i,j) " << i << ", " << j << "): " << Hwave_arr(i,j,k) << std::endl;   
+
             if (Hwave_arr(i,j,k)<0) {
                 Lmask_arr(i,j,k) = 1;
              } else {
                 Lmask_arr(i,j,k) = 0;
             }
-            /*
-            IntVect iv(i, j, k);
+            
                 int value = Lmask_arr(i,j,k);
-                amrex::Print() << "Proc " << amrex::ParallelDescriptor::MyProc()
+                amrex::AllPrintToFile("landmask.txt") << "Proc " << amrex::ParallelDescriptor::MyProc()
                                << ", Index: " << iv << ", Lmask_arr = "
                                << value << std::endl;
-            */                   
+                               
         });
     }
     
-
 
 }
 
