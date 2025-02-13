@@ -94,6 +94,10 @@ struct adiabatic
                   const amrex::Array4<amrex::Real>& /*eta_arr*/) const
     {
         u_star_arr(i,j,k) = mdata.kappa * umm_arr(i,j,k) / std::log(mdata.zref / z0_arr(i,j,k));
+        amrex::AllPrintToFile("u_star_constant1.txt") << "(" << i << ", " << j << ", " << k <<  ") "  << u_star_arr(i,j,k) << std::endl;
+        amrex::AllPrintToFile("u_star_constant2.txt")  << u_star_arr(i,j,k) << std::endl;
+        //amrex::Print() << "constant case" << std::endl;
+
         t_star_arr(i,j,k) = 0.0;
         olen_arr(i,j,k)   = 1.0e16;
     }
@@ -146,7 +150,7 @@ struct adiabatic_charnock
             u_star_arr(i,j,k) = mdata.kappa * umm_arr(i,j,k) / std::log(mdata.zref / z0);
             ++iter;
         } while ((std::abs(u_star_arr(i,j,k) - ustar) > tol) && iter <= max_iters);
-
+amrex::Print() << "charnock case" << std::endl;
         t_star_arr(i,j,k) = 0.0;
           olen_arr(i,j,k) = 1.0e16;
             z0_arr(i,j,k) = z0;
@@ -202,7 +206,7 @@ struct adiabatic_mod_charnock
             u_star_arr(i,j,k) = mdata.kappa * umm_arr(i,j,k) / std::log(mdata.zref / z0);
             ++iter;
         } while ((std::abs(u_star_arr(i,j,k) - ustar) > tol) && iter <= max_iters);
-
+amrex::Print() << "modified charnock case" << std::endl;
         t_star_arr(i,j,k) = 0.0;
           olen_arr(i,j,k) = 1.0e16;
             z0_arr(i,j,k) = z0;
@@ -249,6 +253,7 @@ struct adiabatic_wave_coupled
         amrex::Real ustar = 0.0;
         amrex::Real z0    = 0.0;
         int ie, je;
+
         ie = i  < lbound(eta_arr).x ? lbound(eta_arr).x : i;
         je = j  < lbound(eta_arr).y ? lbound(eta_arr).y : j;
         ie = ie > ubound(eta_arr).x ? ubound(eta_arr).x : ie;
@@ -262,9 +267,15 @@ struct adiabatic_wave_coupled
             ++iter;
         } while ((std::abs(u_star_arr(i,j,k) - ustar) > tol) && iter <= max_iters);
 
+            //amrex::AllPrintToFile("u_star.txt") << "(i,j,k) = (" << i << ", " << j << ", " << k <<  ") U_STAR = " << u_star_arr(i,j,k) << std::endl; 
+            //amrex::Print() << "waves case" << std::endl;
         t_star_arr(i,j,k) = 0.0;
           olen_arr(i,j,k) = 1.0e16;
             z0_arr(i,j,k) = z0;
+
+                amrex::AllPrintToFile("u_star.txt")  << u_star_arr(i,j,k) << std::endl; 
+                amrex::AllPrintToFile("hwave_test.txt")  << Hwave_arr(i,j,k) << std::endl; 
+                amrex::AllPrintToFile("z0.txt") << z0_arr(i,j,k) << std::endl;
     }
 
 private:

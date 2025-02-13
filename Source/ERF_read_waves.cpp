@@ -25,9 +25,11 @@ ERF::read_waves (int lev)
          //amrex::Print() <<  " Just called ERF::read_waves to receive from WW3 " << bx << std::endl;
          amrex::Array4<Real> my_H_arr = Hwave_onegrid[lev]->array(mfi);
          amrex::Array4<Real> my_L_arr = Lwave_onegrid[lev]->array(mfi);
+        /*
         amrex::Print() << "my Valid box: (orig) ("
                << bx.smallEnd(0) << ", " << bx.smallEnd(1) << ") to ("
                << bx.bigEnd(0) << ", " << bx.bigEnd(1) << ")" << std::endl;
+         */
          Real* my_H_ptr = my_H_arr.dataPtr();
          Real* my_L_ptr = my_L_arr.dataPtr();
          
@@ -95,7 +97,7 @@ ERF::read_waves (int lev)
     int ny = bx.length(1);
     std::vector<amrex::Real> temp_bufferH(nx * ny, 1.0);
     std::vector<amrex::Real> temp_bufferL(nx * ny, 1.0);
-    amrex::AllPrint() << " NX ,NY: " << nx << " " << ny << std::endl; 
+    //amrex::AllPrint() << " NX ,NY: " << nx << " " << ny << std::endl; 
     //amrex::AllPrint() << "temp_bufferH size:" << temp_bufferH.size() << " from rank " << amrex::ParallelDescriptor::MyProc() << std::endl; 
     //amrex::AllPrint() << " temp_buffer size: " << temp_buffer.size() << " my rank is " << amrex::MPMD::MyProc()<<std::endl; 
    
@@ -104,9 +106,9 @@ ERF::read_waves (int lev)
         const Array4<Real const>& arr_onegridH = Hwave_onegrid[lev]->const_array(mfi);
         int index = 0;
         const Box& bx = mfi.validbox();
-        amrex::Print() << "my Valid box: ("
+       /* amrex::Print() << "my Valid box: ("
                << bx.smallEnd(0) << ", " << bx.smallEnd(1) << ") to ("
-               << bx.bigEnd(0) << ", " << bx.bigEnd(1) << ")" << std::endl;
+               << bx.bigEnd(0) << ", " << bx.bigEnd(1) << ")" << std::endl;*/
         for (int j = 0; j < ny; ++j) {
             for (int i = 0; i < nx; ++i) {
                     amrex::AllPrintToFile("debug_index.txt")<< index << " i, j: "<< i << ", " << j << " j "<< arr_onegridH(i, j, 0)<<std::endl;
@@ -131,14 +133,14 @@ ERF::read_waves (int lev)
 
     ParallelDescriptor::Barrier();
     amrex::ParallelDescriptor::Bcast(temp_bufferL.data(), temp_bufferL.size(), 0);
-    
+    /*
     for (int i = 0; i < 25; ++i){
         amrex::Print() << i << " temp_buffer from rank " << amrex::ParallelDescriptor::MyProc() << " (after) " << temp_bufferH[i] << std::endl;
     }
-    
+    */
 
     ParallelDescriptor::Barrier();
-    amrex::Print() << " temp_bufferH.size: " << temp_bufferH.size() << std::endl;
+    //amrex::Print() << " temp_bufferH.size: " << temp_bufferH.size() << std::endl;
 
 for (MFIter mfi(*Hwave[lev]); mfi.isValid(); ++mfi) {
     const Box& bx = mfi.validbox();
@@ -148,16 +150,10 @@ for (MFIter mfi(*Hwave[lev]); mfi.isValid(); ++mfi) {
     const Box& domain_box = geom_at_level.Domain();
     int NX = domain_box.length(0);
     int NY = domain_box.length(1);
-    amrex::AllPrint() << " BIG NX ,NY: " << nx << " " << ny <<" my rank is " << amrex::ParallelDescriptor::MyProc()<< std::endl;
+    //amrex::AllPrint() << " BIG NX ,NY: " << nx << " " << ny <<" my rank is " << amrex::ParallelDescriptor::MyProc()<< std::endl;
     
     int nx = bx.length(0);
     int ny = bx.length(1);
-    amrex::AllPrint() << " small nx ,ny: " << nx << " " << ny <<" my rank is " << amrex::ParallelDescriptor::MyProc()<< std::endl;
-    amrex::AllPrint() << " arr_hwave size: " << arr_hwave.size() << " my rank is " << amrex::ParallelDescriptor::MyProc()<< std::endl;
-    amrex::AllPrint() << "my Valid box: (" 
-               << bx.smallEnd(0) << ", " << bx.smallEnd(1) << ") to ("
-               << bx.bigEnd(0) << ", " << bx.bigEnd(1) << ")" <<  " my rank is " << amrex::ParallelDescriptor::MyProc() << std::endl;
-    
 
     amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
         // Calculate the global index for the temp_buffer

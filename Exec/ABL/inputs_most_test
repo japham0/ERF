@@ -1,13 +1,13 @@
 # ------------------  INPUTS TO MAIN PROGRAM  -------------------
-max_step = 200
+max_step = 8
 
 amrex.fpe_trap_invalid = 1
 
 fabarray.mfiter_tile_size = 1024 1024 1024
 
 # PROBLEM SIZE & GEOMETRY
-geometry.prob_extent =  256   256   256
-amr.n_cell           =   16    16    16
+geometry.prob_extent =  41   41   1024
+amr.n_cell           =   41    41    4
 
 geometry.is_periodic = 1 1 0
 
@@ -20,8 +20,8 @@ erf.most.average_policy    = 0       # POLICY FOR AVERAGING
 #erf.most.use_normal_vector = true    # USE NORMAL VECTOR W/ TERRAIN   
 #erf.most.time_average      = true    # USE TIME AVERAGING
 #-----------------------------------------------------------------        
-erf.most.z0                = 4.0     # SURFACE ROUGHNESS
-erf.most.zref              = 8.0     # QUERY DISTANCE (HEIGHT OR NORM LENGTH)
+#erf.most.z0                = 4.0     # SURFACE ROUGHNESS
+erf.most.zref              = 128.0     # QUERY DISTANCE (HEIGHT OR NORM LENGTH)
 #----------------------------------------------------------------- 
 #erf.most.surf_temp         = 301.0   # SPECIFIED SURFACE TEMP
 #erf.most.surf_temp_flux    = 8.14165 # SPECIFIED SURFACE FLUX
@@ -33,7 +33,7 @@ erf.most.zref              = 8.0     # QUERY DISTANCE (HEIGHT OR NORM LENGTH)
 
 
 # TIME STEP CONTROL
-erf.fixed_dt       = 0.1  # fixed time step depending on grid resolution
+erf.fixed_dt       = 1  # fixed time step depending on grid resolution
 
 # DIAGNOSTICS & VERBOSITY
 erf.sum_interval   = 1       # timesteps between computing mass
